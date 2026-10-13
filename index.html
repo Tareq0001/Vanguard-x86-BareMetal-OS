@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" id="app-root">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vanguard-x86 | Pure Assembly Bare-Metal OS & Architecture Workstation</title>
+    <!-- Font Awesome & Google Fonts -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #06080c;
+            --bg-panel: rgba(12, 17, 28, 0.9);
+            --border-glow: #1a2438;
+            --border-accent: #10b981;
+            --crt-green: #10b981;
+            --crt-amber: #f59e0b;
+            --crt-cyan: #06b6d4;
+            --crt-red: #ef4444;
+            --crt-purple: #a855f7;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --font-mono: 'JetBrains Mono', monospace;
+            --font-ui: 'Tajawal', system-ui, sans-serif;
+        }
+
+        html[dir="ltr"] {
+            --font-ui: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: var(--font-ui);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(16, 185, 129, 0.08) 0%, transparent 45%),
+                radial-gradient(circle at 90% 80%, rgba(6, 182, 212, 0.08) 0%, transparent 45%);
+        }
+
+        /* Top Header */
+        header {
+            height: 64px;
+            background: rgba(12, 17, 28, 0.94);
+            backdrop-filter: blur(14px);
+            border-bottom: 1px solid var(--border-glow);
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .brand-section {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #059669, #0284c7);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #fff;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.45);
+        }
+
+        .brand-text h1 {
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(90deg, #34d399, #38bdf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-text p {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .header-status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            color: var(--crt-green);
+            padding: 4px 14px;
+            border-radius: 9999px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn-ui {
+            background: rgba(26, 36, 56, 0.6);
+            border: 1px solid var(--border-glow);
+            color: var(--text-main);
+            padding: 7px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-family: var(--font-mono);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-ui:hover {
+            border-color: var(--crt-green);
+            background: #1e293b;
+            color: var(--crt-green);
+        }
+
+        /* Main Workspace Layout */
+        .workspace {
+            display: grid;
+            grid-template-columns: 340px 1fr 340px;
+            gap: 16px;
+            padding: 16px 20px;
+            flex: 1;
+            min-height: calc(100vh - 64px);
+        }
+
+        @media (max-width: 1280px) {
+            .workspace {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Panel Container */
+        .panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-glow);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+        }
+
+        .panel-header {
+            padding: 12px 16px;
+            background: rgba(12, 17, 28, 0.85);
+            border-bottom: 1px solid var(--border-glow);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-body {
+            padding: 16px;
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* Live Registers Grid */
+        .regs-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            font-family: var(--font-mono);
+        }
+
+        .reg-card {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-glow);
+            border-radius: 6px;
+            padding: 8px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .reg-name {
+            font-size: 11px;
+            color: #38bdf8;
+            font-weight: 700;
+        }
+
+        .reg-val {
+            font-size: 12px;
+            color: #34d399;
+            font-weight: 600;
+        }
+
+        /* Center CRT Terminal Viewport */
+        .viewport-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            position: relative;
+        }
+
+        .crt-terminal-card {
+            background: #000;
+            border: 2px solid #1a2a20;
+            border-radius: 12px;
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.15) inset, 0 10px 30px rgba(0, 0, 0, 0.8);
+            min-height: 480px;
+        }
+
+        /* Scanline Overlay Effect */
+        .crt-scanlines {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 3px, 3px 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .crt-screen {
+            flex: 1;
+            padding: 16px;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            line-height: 1.5;
+            color: #22c55e;
+            text-shadow: 0 0 5px rgba(34, 197, 94, 0.7);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            white-space: pre-wrap;
+            z-index: 5;
+        }
+
+        .crt-input-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: rgba(10, 15, 12, 0.8);
+            border-top: 1px solid #1a2a20;
+            z-index: 5;
+        }
+
+        .crt-prompt {
+            color: #38bdf8;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            font-size: 13px;
+        }
+
+        .crt-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #22c55e;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            text-shadow: 0 0 5px rgba(34, 197, 94, 0.7);
+        }
+
+        /* Bottom Row: Disassembly Stream & RAM Hex Viewer */
+        .bottom-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            height: 200px;
+        }
+
+        .disasm-box {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-glow);
+            border-radius: 10px;
+            padding: 10px 14px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            font-family: var(--font-mono);
+            font-size: 11px;
+        }
+
+        .disasm-header {
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .disasm-stream {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .disasm-line {
+            display: flex;
+            gap: 12px;
+        }
+
+        .disasm-line.current {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            font-weight: 700;
+            border-radius: 3px;
+            padding: 1px 4px;
+        }
+
+        .disasm-addr {
+            color: #64748b;
+        }
+
+        .disasm-hex {
+            color: #94a3b8;
+            width: 70px;
+        }
+
+        .disasm-ins {
+            color: #38bdf8;
+            flex: 1;
+        }
+
+        /* Hex Memory Viewer */
+        .hex-viewer {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            color: #a855f7;
+        }
+
+        /* Mini Assembler Sandbox */
+        .asm-editor {
+            width: 100%;
+            height: 110px;
+            background: #020408;
+            border: 1px solid var(--border-glow);
+            border-radius: 6px;
+            color: #38bdf8;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            padding: 8px;
+            resize: none;
+            outline: none;
+        }
+
+        .asm-editor:focus {
+            border-color: var(--crt-green);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header>
+        <div class="brand-section">
+            <div class="brand-logo">
+                <i class="fa-solid fa-microchip"></i>
+            </div>
+            <div class="brand-text">
+                <h1 data-i18n="appTitle">VANGUARD-x86 | Pure Assembly Bare-Metal OS</h1>
+                <p data-i18n="appSubtitle">100% Assembly Kernel, Protected Mode Transition & Hardware Emulator</p>
+            </div>
+        </div>
+
+        <div class="header-status-badge">
+            <i class="fa-solid fa-circle-check"></i>
+            <span id="cpuStatusText">CPU STATE: i386 PROTECTED MODE (RING 0)</span>
+        </div>
+
+        <div class="header-actions">
+            <button class="btn-ui" onclick="stepInstruction()">
+                <i class="fa-solid fa-forward-step"></i>
+                <span data-i18n="btnStep">STEP INSTRUCTION (EIP)</span>
+            </button>
+            <button class="btn-ui" onclick="rebootSystem()">
+                <i class="fa-solid fa-power-off"></i>
+                <span data-i18n="btnReboot">REBOOT KERNEL</span>
+            </button>
+            <button class="btn-ui" id="langToggleBtn" onclick="toggleLanguage()">
+                <i class="fa-solid fa-globe"></i>
+                <span id="langText">English</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="workspace">
+        
+        <!-- Left Panel: Live CPU Registers & Hardware Architecture -->
+        <aside class="panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <i class="fa-solid fa-server text-cyan-400"></i>
+                    <span data-i18n="regsTitle">CPU Registers (32-Bit GPRs)</span>
+                </div>
+                <span style="font-size: 10px; color: var(--crt-green); font-family: var(--font-mono);">INTEL x86</span>
+            </div>
+
+            <div class="panel-body">
+                <!-- General Purpose Registers -->
+                <div class="regs-grid">
+                    <div class="reg-card">
+                        <span class="reg-name">EAX</span>
+                        <span class="reg-val" id="rEAX">0x00000001</span>
+                    </div>
+                    <div class="reg-card">
+                        <span class="reg-name">EBX</span>
+                        <span class="reg-val" id="rEBX">0x000B8000</span>
+                    </div>
+                    <div class="reg-card">
+                        <span class="reg-name">ECX</span>
+                        <span class="reg-val" id="rECX">0x000007D0</span>
+                    </div>
+                    <div class="reg-card">
+                        <span class="reg-name">EDX</span>
+                        <span class="reg-val" id="rEDX">0x000003D5</span>
+                    </div>
+                    <div class="reg-card">
+                        <span class="reg-name">ESI</span>
+                        <span class="reg-val" id="rESI">0x00007C2A</span>
+                    </div>
+                    <div class="reg-card">
+                        <span class="reg-name">EDI</span>
+                        <span class="reg-val" id="rEDI">0x000B8040</span>
+                    </div>
+                    <div class="reg-card">
+                        <span class="reg-name">ESP</span>
+                        <span class="reg-val" id="rESP">0x0008FFF0</span>
+                    </div>
+                    <div class="reg-card">
+                        <span class="reg-name">EBP</span>
+                        <span class="reg-val" id="rEBP">0x00090000</span>
+                    </div>
+                    <div class="reg-card">
+                        <span class="reg-name">EIP</span>
+                        <span class="reg-val" id="rEIP" style="color: #f59e0b;">0x00007C52</span>
+                    </div>
+                    <div class="reg-card">
+                        <span class="reg-name">EFLAGS</span>
+                        <span class="reg-val" id="rFLAGS">0x00000246</span>
+                    </div>
+                </div>
+
+                <!-- Segment Selectors & Control Registers -->
+                <div class="panel-title" style="margin-top: 6px;">
+                    <i class="fa-solid fa-layer-group text-blue-400"></i>
+                    <span data-i18n="segTitle">Segment Selectors & Control</span>
+                </div>
+                <div class="regs-grid">
+                    <div class="reg-card">
+                        <span class="reg-name">CS</span>
+                        <span class="reg-val">0x08 (Code)</span>
+                    </div>
+                    <div class="reg-card">
+                        <span class="reg-name">DS</span>
+                        <span class="reg-val">0x10 (Data)</span>
+                    </div>
+                    <div class="reg-card">
+                        <span class="reg-name">SS</span>
+                        <span class="reg-val">0x10 (Stack)</span>
+                    </div>
+                    <div class="reg-card">
+                        <span class="reg-name">CR0</span>
+                        <span class="reg-val" style="color: #38bdf8;">0x80000011</span>
+                    </div>
+                </div>
+
+                <!-- Hardware Architecture Info -->
+                <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 12px; font-size: 11px; line-height: 1.6;">
+                    <div style="font-weight: 700; color: #34d399; margin-bottom: 4px;" data-i18n="archTitle">BARE-METAL SPECS</div>
+                    <div data-i18n="archDesc">
+                        • Flat 4GB Memory Model (GDT Descriptors at 0x7C30)<br>
+                        • Direct Memory VGA Framebuffer at 0xB8000 (80x25 Cells)<br>
+                        • Master/Slave PIC 8259 remapped to 0x20-0x2F<br>
+                        • PS/2 Keyboard Scancode Decoder on Port 0x60
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center: CRT Terminal Screen (80x25 Character Buffer) -->
+        <section class="viewport-container">
+            <div class="crt-terminal-card">
+                <div class="crt-scanlines"></div>
+                <div class="crt-screen" id="crtScreen"></div>
+                
+                <div class="crt-input-row">
+                    <span class="crt-prompt">vanguard-os #</span>
+                    <input type="text" class="crt-input" id="terminalInput" autocomplete="off" spellcheck="false" placeholder="type 'help', 'regs', 'mem', 'matrix', 'clear'...">
+                </div>
+            </div>
+
+            <!-- Bottom Row: Live Disassembly & RAM Hex Viewer -->
+            <div class="bottom-row">
+                <!-- Disassembly Stream -->
+                <div class="disasm-box">
+                    <div class="disasm-header">
+                        <span data-i18n="disasmTitle">LIVE CPU INSTRUCTION DECODER (DISASSEMBLY)</span>
+                        <span style="color: var(--crt-green);">NASM SYNTAX</span>
+                    </div>
+                    <div class="disasm-stream" id="disasmList">
+                        <div class="disasm-line current"><span class="disasm-addr">0x7C00</span> <span class="disasm-hex">FA</span> <span class="disasm-ins">cli</span></div>
+                        <div class="disasm-line"><span class="disasm-addr">0x7C01</span> <span class="disasm-hex">31 C0</span> <span class="disasm-ins">xor ax, ax</span></div>
+                        <div class="disasm-line"><span class="disasm-addr">0x7C03</span> <span class="disasm-hex">8E D8</span> <span class="disasm-ins">mov ds, ax</span></div>
+                        <div class="disasm-line"><span class="disasm-addr">0x7C05</span> <span class="disasm-hex">E4 92</span> <span class="disasm-ins">in al, 0x92</span></div>
+                        <div class="disasm-line"><span class="disasm-addr">0x7C07</span> <span class="disasm-hex">0C 02</span> <span class="disasm-ins">or al, 2</span></div>
+                        <div class="disasm-line"><span class="disasm-addr">0x7C09</span> <span class="disasm-hex">E6 92</span> <span class="disasm-ins">out 0x92, al</span></div>
+                        <div class="disasm-line"><span class="disasm-addr">0x7C0B</span> <span class="disasm-hex">0F 01 15</span> <span class="disasm-ins">lgdt [gdt_descriptor]</span></div>
+                        <div class="disasm-line"><span class="disasm-addr">0x7C10</span> <span class="disasm-hex">0F 20 C0</span> <span class="disasm-ins">mov eax, cr0</span></div>
+                        <div class="disasm-line"><span class="disasm-addr">0x7C13</span> <span class="disasm-hex">0C 01</span> <span class="disasm-ins">or al, 1</span></div>
+                        <div class="disasm-line"><span class="disasm-addr">0x7C15</span> <span class="disasm-hex">0F 22 C0</span> <span class="disasm-ins">mov cr0, eax</span></div>
+                        <div class="disasm-line"><span class="disasm-addr">0x7C18</span> <span class="disasm-hex">EA 20 7C 08</span> <span class="disasm-ins">jmp 0x08:0x7C20</span></div>
+                    </div>
+                </div>
+
+                <!-- Hex Memory Dump -->
+                <div class="disasm-box">
+                    <div class="disasm-header">
+                        <span data-i18n="hexTitle">RAM HEX VIEWER & EDITOR (0x7C00 - 0x7D00)</span>
+                        <span style="color: #a855f7;">PHYSICAL MEMORY</span>
+                    </div>
+                    <div class="hex-viewer" id="hexViewer">
+                        <div>0x7C00: FA 31 C0 8E D8 8E C0 8E D0 BC 00 7C FB E4 92 0C</div>
+                        <div>0x7C10: 02 E6 92 FA 0F 01 15 36 7C 00 00 0F 20 C0 0C 01</div>
+                        <div>0x7C20: 0F 22 C0 EA 2A 7C 08 00 B8 10 00 8E D8 8E C0 BC</div>
+                        <div>0x7C30: 00 00 09 00 E8 50 00 E8 20 00 BF 00 80 0B 00 B9</div>
+                        <div>0x7C40: D0 07 00 00 B8 20 07 F3 66 AB BE 80 7C 00 00 B4</div>
+                        <div>0x7C50: 0F E8 80 00 FB F4 EB FD 00 00 00 00 00 00 00 00</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Panel: Live NASM Assembly Sandbox -->
+        <aside class="panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <i class="fa-solid fa-code text-emerald-400"></i>
+                    <span data-i18n="asmSandboxTitle">Live NASM Assembly Sandbox</span>
+                </div>
+                <span style="font-size: 10px; color: var(--crt-green); font-family: var(--font-mono);">x86 JIT</span>
+            </div>
+
+            <div class="panel-body">
+                <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);" data-i18n="asmSandboxDesc">Write pure x86 instructions and assemble directly into CPU registers:</span>
+                
+                <textarea class="asm-editor" id="asmCode" spellcheck="false">mov eax, 0x1337
+mov ebx, 0x42
+add eax, ebx
+xor ecx, ecx
+inc ecx</textarea>
+
+                <button class="btn-ui" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); color: var(--crt-green); font-weight: 700; justify-content: center;" onclick="assembleAndExecute()">
+                    <i class="fa-solid fa-play"></i>
+                    <span data-i18n="btnAssemble">ASSEMBLE & EXECUTE</span>
+                </button>
+
+                <!-- Source Architecture Tree -->
+                <div class="panel-title" style="margin-top: 6px;">
+                    <i class="fa-solid fa-folder-tree text-amber-400"></i>
+                    <span data-i18n="repoTreeTitle">Kernel Source Tree (.asm)</span>
+                </div>
+
+                <div style="background: #020408; border: 1px solid var(--border-glow); border-radius: 6px; padding: 10px; font-family: var(--font-mono); font-size: 11px; line-height: 1.6; color: #94a3b8;">
+                    <div><i class="fa-regular fa-file-code text-cyan-400"></i> src/boot/boot.asm (512B MBR)</div>
+                    <div><i class="fa-regular fa-file-code text-emerald-400"></i> src/kernel/kernel.asm (Ring 0)</div>
+                    <div><i class="fa-regular fa-file-code text-emerald-400"></i> src/kernel/gdt.asm (Flat 4GB)</div>
+                    <div><i class="fa-regular fa-file-code text-emerald-400"></i> src/kernel/idt.asm (PIC Remap)</div>
+                    <div><i class="fa-regular fa-file-code text-amber-400"></i> src/drivers/vga.asm (0xB8000)</div>
+                    <div><i class="fa-regular fa-file-code text-amber-400"></i> src/drivers/keyboard.asm (0x60)</div>
+                    <div><i class="fa-regular fa-file-code text-purple-400"></i> src/shell/shell.asm (CLI)</div>
+                    <div><i class="fa-regular fa-file text-blue-400"></i> Makefile (NASM & QEMU)</div>
+                </div>
+
+                <!-- GitHub Direct Link -->
+                <a href="https://github.com/Tareq0001/Vanguard-x86-BareMetal-OS" target="_blank" class="btn-ui" style="justify-content: center; text-decoration: none;">
+                    <i class="fa-brands fa-github"></i>
+                    <span data-i18n="btnGitHub">VIEW REPO ON GITHUB</span>
+                </a>
+            </div>
+        </aside>
+    </main>
+
+    <script>
+        // Localization Dictionary
+        const I18N = {
+            ar: {
+                appTitle: "VANGUARD-x86 | نظام تشغيل ونواة بلغة التجميع (Assembly)",
+                appSubtitle: "نواة مدمجة مكتوبة 100% بلغة x86 Assembly مع محاكي معالج ومسجلات حية",
+                btnStep: "تنفيذ تعليمة خطوة بخطوة (EIP)",
+                btnReboot: "إعادة إقلاع النواة",
+                regsTitle: "مسجلات المعالج العامة (32-Bit GPRs)",
+                segTitle: "واصفات المقاطع والتحكم (CR0)",
+                archTitle: "المواصفات العتادية للنواة",
+                archDesc: "• نموذج ذاكرة مسطح 4 جيجابايت (واصفات GDT)\n• وصول مباشر لذاكرة شاشة VGA عند 0xB8000\n• إعادة توجيه مقاطعات PIC 8259 إلى 0x20-0x2F\n• فك شفرات لوحة مفاتيح PS/2 عبر المنفذ 0x60",
+                disasmTitle: "مفكك تعليمات المعالج اللحظي (Disassembler)",
+                hexTitle: "مستعرض الذاكرة العشوائية السداسي عشري (RAM Hex)",
+                asmSandboxTitle: "محرر ومجمّع أسمبلي NASM المباشر",
+                asmSandboxDesc: "اكتب تعليمات x86 وقم بتجميعها وتنفيذها لمشاهدة تأثيرها الفوري على المسجلات:",
+                btnAssemble: "تجميع وتنفيذ الأسمبلي (JIT)",
+                repoTreeTitle: "شجرة الكود المصدري (.asm)",
+                btnGitHub: "استعراض الكود على GitHub"
+            },
+            en: {
+                appTitle: "VANGUARD-x86 | Pure Assembly Bare-Metal OS",
+                appSubtitle: "100% Assembly Kernel, Protected Mode Transition & Hardware Emulator",
+                btnStep: "STEP INSTRUCTION (EIP)",
+                btnReboot: "REBOOT KERNEL",
+                regsTitle: "CPU Registers (32-Bit GPRs)",
+                segTitle: "Segment Selectors & Control",
+                archTitle: "BARE-METAL SPECS",
+                archDesc: "• Flat 4GB Memory Model (GDT Descriptors)\n• Direct Memory VGA Framebuffer at 0xB8000 (80x25)\n• PIC 8259 remapped to vectors 0x20-0x2F\n• PS/2 Keyboard Scancode Decoder on Port 0x60",
+                disasmTitle: "LIVE CPU INSTRUCTION DECODER (DISASSEMBLY)",
+                hexTitle: "RAM HEX VIEWER & EDITOR (0x7C00 - 0x7D00)",
+                asmSandboxTitle: "Live NASM Assembly Sandbox",
+                asmSandboxDesc: "Write pure x86 instructions and assemble directly into CPU registers:",
+                btnAssemble: "ASSEMBLE & EXECUTE",
+                repoTreeTitle: "Kernel Source Tree (.asm)",
+                btnGitHub: "VIEW REPO ON GITHUB"
+            }
+        };
+
+        let currentLang = 'ar';
+
+        function toggleLanguage() {
+            currentLang = currentLang === 'ar' ? 'en' : 'ar';
+            document.getElementById('app-root').dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+            document.getElementById('app-root').lang = currentLang;
+            document.getElementById('langText').textContent = currentLang === 'ar' ? 'English' : 'العربية';
+
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (I18N[currentLang][key]) {
+                    el.textContent = I18N[currentLang][key];
+                }
+            });
+        }
+
+        // x86 CPU Virtual Machine State
+        const cpu = {
+            eax: 0x00000001,
+            ebx: 0x000B8000,
+            ecx: 0x000007D0,
+            edx: 0x000003D5,
+            esi: 0x00007C2A,
+            edi: 0x000B8040,
+            esp: 0x0008FFF0,
+            ebp: 0x00090000,
+            eip: 0x00007C52,
+            eflags: 0x00000246,
+            cr0: 0x80000011
+        };
+
+        function updateRegistersUI() {
+            document.getElementById('rEAX').textContent = '0x' + (cpu.eax >>> 0).toString(16).toUpperCase().padStart(8, '0');
+            document.getElementById('rEBX').textContent = '0x' + (cpu.ebx >>> 0).toString(16).toUpperCase().padStart(8, '0');
+            document.getElementById('rECX').textContent = '0x' + (cpu.ecx >>> 0).toString(16).toUpperCase().padStart(8, '0');
+            document.getElementById('rEDX').textContent = '0x' + (cpu.edx >>> 0).toString(16).toUpperCase().padStart(8, '0');
+            document.getElementById('rESI').textContent = '0x' + (cpu.esi >>> 0).toString(16).toUpperCase().padStart(8, '0');
+            document.getElementById('rEDI').textContent = '0x' + (cpu.edi >>> 0).toString(16).toUpperCase().padStart(8, '0');
+            document.getElementById('rESP').textContent = '0x' + (cpu.esp >>> 0).toString(16).toUpperCase().padStart(8, '0');
+            document.getElementById('rEBP').textContent = '0x' + (cpu.ebp >>> 0).toString(16).toUpperCase().padStart(8, '0');
+            document.getElementById('rEIP').textContent = '0x' + (cpu.eip >>> 0).toString(16).toUpperCase().padStart(8, '0');
+            document.getElementById('rFLAGS').textContent = '0x' + (cpu.eflags >>> 0).toString(16).toUpperCase().padStart(8, '0');
+        }
+
+        // CRT Terminal Screen Simulation
+        const crtScreen = document.getElementById('crtScreen');
+        const terminalInput = document.getElementById('terminalInput');
+
+        function printToCRT(text, color = '#22c55e') {
+            const span = document.createElement('span');
+            span.style.color = color;
+            span.textContent = text + '\n';
+            crtScreen.appendChild(span);
+            crtScreen.scrollTop = crtScreen.scrollHeight;
+        }
+
+        function rebootSystem() {
+            crtScreen.innerHTML = '';
+            printToCRT("BIOS POST (Power-On Self-Test)... OK", "#38bdf8");
+            printToCRT("Loading MBR Boot Sector from Drive 0x80 [0x7C00]... OK", "#38bdf8");
+            printToCRT("Enabling A20 Line via Fast Gate 0x92... OK", "#34d399");
+            printToCRT("Loading Global Descriptor Table [GDTR = 0x7C30]... OK", "#34d399");
+            printToCRT("Switching to 32-Bit Protected Mode [CR0 |= 1]... OK", "#10b981");
+            printToCRT("Far Jump to 0x08:0x7C20 (Kernel Entry)... OK", "#10b981");
+            printToCRT("Remapping PIC 8259 IRQ 0-15 to vectors 0x20-0x2F... OK", "#38bdf8");
+            printToCRT("Direct Memory VGA Text Buffer mapped at 0xB8000.", "#38bdf8");
+            printToCRT("==================================================================", "#10b981");
+            printToCRT("  VANGUARD-x86 BARE-METAL OPERATING SYSTEM (v1.0.4)", "#fff");
+            printToCRT("  Engineered in 100% Pure x86 Assembly by Tareq Aboushi", "#38bdf8");
+            printToCRT("==================================================================", "#10b981");
+            printToCRT("Type 'help' for available bare-metal commands.\n", "#f59e0b");
+            cpu.eip = 0x7C52;
+            updateRegistersUI();
+        }
+
+        terminalInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const cmd = terminalInput.value.trim().toLowerCase();
+                printToCRT("vanguard-os # " + terminalInput.value, "#38bdf8");
+                terminalInput.value = '';
+                executeShellCommand(cmd);
+            }
+        });
+
+        function executeShellCommand(cmd) {
+            cpu.eip += 0x14;
+            if (cmd === 'help') {
+                printToCRT("AVAILABLE BARE-METAL SYSTEM COMMANDS:", "#f59e0b");
+                printToCRT("  help      - Display this list of kernel commands");
+                printToCRT("  regs      - Dump 32-bit CPU general purpose & control registers");
+                printToCRT("  mem       - Inspect system memory map and VGA buffer at 0xB8000");
+                printToCRT("  gdt       - Dump Global Descriptor Table descriptors");
+                printToCRT("  disasm    - Disassemble instruction stream at current EIP");
+                printToCRT("  matrix    - Run assembly green CRT phosphor cascade");
+                printToCRT("  clear     - Clear VGA text buffer at 0xB8000");
+                printToCRT("  reboot    - Trigger CPU reset pulse via keyboard controller 0x64");
+            } else if (cmd === 'regs') {
+                printToCRT(`EAX: 0x${(cpu.eax>>>0).toString(16).toUpperCase().padStart(8,'0')}  EBX: 0x${(cpu.ebx>>>0).toString(16).toUpperCase().padStart(8,'0')}  ECX: 0x${(cpu.ecx>>>0).toString(16).toUpperCase().padStart(8,'0')}  EDX: 0x${(cpu.edx>>>0).toString(16).toUpperCase().padStart(8,'0')}`, "#34d399");
+                printToCRT(`ESI: 0x${(cpu.esi>>>0).toString(16).toUpperCase().padStart(8,'0')}  EDI: 0x${(cpu.edi>>>0).toString(16).toUpperCase().padStart(8,'0')}  ESP: 0x${(cpu.esp>>>0).toString(16).toUpperCase().padStart(8,'0')}  EBP: 0x${(cpu.ebp>>>0).toString(16).toUpperCase().padStart(8,'0')}`, "#34d399");
+                printToCRT(`EIP: 0x${(cpu.eip>>>0).toString(16).toUpperCase().padStart(8,'0')}  EFLAGS: 0x${(cpu.eflags>>>0).toString(16).toUpperCase().padStart(8,'0')}  CR0: 0x${(cpu.cr0>>>0).toString(16).toUpperCase().padStart(8,'0')}`, "#38bdf8");
+            } else if (cmd === 'mem') {
+                printToCRT("MEMORY MAP (x86 BARE-METAL):", "#f59e0b");
+                printToCRT("  0x00000000 - 0x000003FF : Real-Mode Interrupt Vector Table (IVT)");
+                printToCRT("  0x00007C00 - 0x00007DFF : MBR Boot Sector (512 Bytes)");
+                printToCRT("  0x00080000 - 0x00090000 : Kernel Stack Space (ESP)");
+                printToCRT("  0x000A0000 - 0x000AFFFF : VGA Graphics Framebuffer (Mode 13h)");
+                printToCRT("  0x000B8000 - 0x000BFFFF : VGA Color Text Buffer (80x25)");
+            } else if (cmd === 'gdt') {
+                printToCRT("GLOBAL DESCRIPTOR TABLE [GDTR Base: 0x7C30, Limit: 23]:", "#a855f7");
+                printToCRT("  Descriptor 0 (0x00): Null Descriptor");
+                printToCRT("  Descriptor 1 (0x08): Kernel Code [Base: 0x0, Limit: 4GB, RX, Ring 0, 32-bit]");
+                printToCRT("  Descriptor 2 (0x10): Kernel Data [Base: 0x0, Limit: 4GB, RW, Ring 0, 32-bit]");
+            } else if (cmd === 'clear') {
+                crtScreen.innerHTML = '';
+            } else if (cmd === 'reboot') {
+                rebootSystem();
+            } else if (cmd === 'matrix') {
+                printToCRT("10100101 11001010 01011100 11110000 00110011", "#10b981");
+                printToCRT("VANGUARD-x86 KERNEL PHOSPHOR CASCADE INITIALIZED", "#34d399");
+            } else if (cmd === '') {
+                // Do nothing
+            } else {
+                printToCRT(`vanguard-os: command not found: '${cmd}'. Type 'help' for command list.`, "#ef4444");
+            }
+            updateRegistersUI();
+        }
+
+        // Stepper
+        function stepInstruction() {
+            cpu.eip += 2;
+            cpu.eax = (cpu.eax + 0x42) >>> 0;
+            cpu.ebx = (cpu.ebx ^ 0x00000010) >>> 0;
+            cpu.esp = (cpu.esp - 4) >>> 0;
+            updateRegistersUI();
+            printToCRT(`[STEP] Executed instruction at 0x${(cpu.eip>>>0).toString(16).toUpperCase()}; EAX=0x${(cpu.eax>>>0).toString(16).toUpperCase()}`, "#38bdf8");
+        }
+
+        // Live In-Browser Mini Assembler JIT
+        function assembleAndExecute() {
+            const code = document.getElementById('asmCode').value;
+            const lines = code.split('\n');
+            printToCRT(">>> NASM ASSEMBLER: Assembling and dispatching instructions...", "#f59e0b");
+
+            for(let line of lines) {
+                line = line.trim();
+                if(!line || line.startsWith(';')) continue;
+                printToCRT("  ASM: " + line, "#38bdf8");
+
+                // Simple simulated x86 parser for common instructions
+                const parts = line.replace(/,/g, ' ').split(/\s+/);
+                const op = parts[0].toLowerCase();
+                const reg1 = parts[1] ? parts[1].toLowerCase() : null;
+                const reg2 = parts[2] ? parts[2].toLowerCase() : null;
+
+                if (op === 'mov') {
+                    const val = reg2.startsWith('0x') ? parseInt(reg2, 16) : parseInt(reg2, 10);
+                    if (cpu[reg1] !== undefined) cpu[reg1] = isNaN(val) ? (cpu[reg2] || 0) : val;
+                } else if (op === 'add') {
+                    const val = reg2.startsWith('0x') ? parseInt(reg2, 16) : parseInt(reg2, 10);
+                    if (cpu[reg1] !== undefined) cpu[reg1] = (cpu[reg1] + (isNaN(val) ? (cpu[reg2]||0) : val)) >>> 0;
+                } else if (op === 'sub') {
+                    const val = reg2.startsWith('0x') ? parseInt(reg2, 16) : parseInt(reg2, 10);
+                    if (cpu[reg1] !== undefined) cpu[reg1] = (cpu[reg1] - (isNaN(val) ? (cpu[reg2]||0) : val)) >>> 0;
+                } else if (op === 'xor') {
+                    if (reg1 === reg2 && cpu[reg1] !== undefined) cpu[reg1] = 0;
+                    else if (cpu[reg1] !== undefined && cpu[reg2] !== undefined) cpu[reg1] = (cpu[reg1] ^ cpu[reg2]) >>> 0;
+                } else if (op === 'inc') {
+                    if (cpu[reg1] !== undefined) cpu[reg1] = (cpu[reg1] + 1) >>> 0;
+                }
+                cpu.eip += 3;
+            }
+
+            updateRegistersUI();
+            printToCRT(">>> Assembly execution successful. Registers updated.", "#10b981");
+        }
+
+        // Init
+        rebootSystem();
+    </script>
+</body>
+</html>
